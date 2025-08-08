@@ -1,3 +1,5 @@
+-- Kucing Hub v0.7 — single file (UI + drag/min/max/close + draggable floating GitHub avatar)
+-- Tempel ke main.lua kamu
 
 -- Services
 local Players = game:GetService("Players")
@@ -23,14 +25,14 @@ local TEXT = Color3.fromRGB(235,238,245)
 local SUB  = Color3.fromRGB(170,176,190)
 local ACC  = Color3.fromRGB(92,156,255)
 
--- Clean old
+-- Bersihin UI lama
 local old = CoreGui:FindFirstChild("KucingHubUI")
 if old then old:Destroy() end
 
 -- Root
 local gui = mk("ScreenGui", CoreGui, {Name="KucingHubUI", ZIndexBehavior=Enum.ZIndexBehavior.Sibling, ResetOnSpawn=false})
 
--- Responsive window size
+-- Responsif window size
 local function getWindowSize()
     local vw, vh = Camera.ViewportSize.X, Camera.ViewportSize.Y
     local w = math.clamp(math.floor(vw * 0.42), 420, 540)
@@ -38,19 +40,39 @@ local function getWindowSize()
     return UDim2.fromOffset(w, h)
 end
 
--- Floating restore button (center bottom)
+-- ===== Floating restore button (GitHub avatar + draggable) =====
+local GITHUB_USER = "KUCING-POLOS" -- ganti kalau user GitHub-mu beda
 local floatBtn = mk("ImageButton", gui, {
     Name="KucingFloat",
-    Size=UDim2.fromOffset(40,40),
-    AnchorPoint=Vector2.new(0.5,1),
-    Position=UDim2.new(0.5, 0, 1, -20),
-    BackgroundColor3=PANEL,
-    AutoButtonColor=true,
-    Visible=false,
-    ZIndex=1000
+    Size = UDim2.fromOffset(40,40),
+    AnchorPoint = Vector2.new(0.5,1),
+    Position = UDim2.new(0.5, 0, 1, -20), -- default tengah bawah
+    BackgroundColor3 = PANEL,
+    AutoButtonColor = true,
+    Visible = false,
+    ZIndex = 1000
 })
 corner(floatBtn,20); stroke(floatBtn,1)
-do
+
+-- Coba load avatar GitHub -> file lokal -> getcustomasset (butuh dukungan executor)
+local http = (syn and syn.request) or request or http_request
+local getasset = getcustomasset or getsynasset
+local function tryLoadGithubAvatar()
+    if not (http and writefile and getasset) then return false end
+    local url = ("https://github.com/%s.png?size=100"):format(GITHUB_USER)
+    local ok, res = pcall(http, {Url = url, Method = "GET"})
+    if not ok or not res or not res.Body then return false end
+    local fname = "kucinghub_avatar.png"
+    pcall(function() if isfile(fname) then delfile(fname) end end)
+    local okW = pcall(writefile, fname, res.Body)
+    if not okW then return false end
+    local okA, asset = pcall(getasset, fname)
+    if not okA then return false end
+    floatBtn.Image = asset
+    return true
+end
+if not tryLoadGithubAvatar() then
+    -- fallback ke avatar Roblox kalau executor gak support custom asset
     local ok, img = pcall(function()
         return Players:GetUserThumbnailAsync(Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
     end)
@@ -71,18 +93,16 @@ corner(win,14); stroke(win,1)
 -- Header
 local header = mk("Frame", win, {Size=UDim2.new(1,0,0,36), BackgroundColor3=PANEL})
 corner(header,10); stroke(header,1)
-
 mk("TextLabel", header, {
     BackgroundTransparency=1,
     Size=UDim2.new(1,-120,1,0),
     Position=UDim2.fromOffset(10,0),
     Font=Enum.Font.GothamBold,
-    Text="Kucing Hub | v0.6.1",
+    Text="Kucing Hub | v0.7",
     TextColor3=TEXT,
     TextSize=16,
     TextXAlignment=Enum.TextXAlignment.Left
 })
-
 local btnMin = mk("TextButton", header, {Size=UDim2.fromOffset(22,22), Position=UDim2.new(1,-70,0,7), AnchorPoint=Vector2.new(1,0), Text="–", TextColor3=TEXT, BackgroundColor3=Color3.fromRGB(50,50,58), Font=Enum.Font.GothamBold, TextSize=16})
 local btnMax = mk("TextButton", header, {Size=UDim2.fromOffset(22,22), Position=UDim2.new(1,-44,0,7), AnchorPoint=Vector2.new(1,0), Text="□", TextColor3=TEXT, BackgroundColor3=Color3.fromRGB(50,50,58), Font=Enum.Font.GothamBold, TextSize=14})
 local btnClose = mk("TextButton", header, {Size=UDim2.fromOffset(22,22), Position=UDim2.new(1,-18,0,7), AnchorPoint=Vector2.new(1,0), Text="×", TextColor3=Color3.fromRGB(255,120,120), BackgroundColor3=Color3.fromRGB(50,50,58), Font=Enum.Font.GothamBold, TextSize=14})
@@ -91,7 +111,7 @@ corner(btnMin,8); stroke(btnMin,1); corner(btnMax,8); stroke(btnMax,1); corner(b
 -- Body layout
 local body = mk("Frame", win, {Size=UDim2.new(1,0,1,-44), Position=UDim2.fromOffset(0,40), BackgroundTransparency=1})
 
--- Sidebar as ScrollingFrame (so last tab won't overflow)
+-- Sidebar scroll + clip (biar tab terakhir gak nembus)
 local sidebar = mk("ScrollingFrame", body, {
     Size=UDim2.new(0,116,1,0),
     BackgroundColor3=BG,
@@ -144,7 +164,7 @@ local function card(parent, title, subtitle)
     return f
 end
 
--- Make tabs & pages
+-- Tabs & Pages
 local P_Main   = addPage("Main")
 local P_Farm   = addPage("Farm")
 local P_Shop   = addPage("Shop")
@@ -152,13 +172,12 @@ local P_Pet    = addPage("Pet")
 local P_Utility= addPage("Utility")
 local P_Misc   = addPage("Misc")
 local P_Visual = addPage("Visual")
-
 addTab("Main"); addTab("Farm"); addTab("Shop"); addTab("Pet"); addTab("Utility"); addTab("Misc"); addTab("Visual")
 
--- Content example (no executor text)
-card(P_Main, "Information", "Kucing Hub v0.6.1")
+-- Content contoh
+card(P_Main, "Information", "Kucing Hub v0.7")
 
--- FARM demo (toggle loop)
+-- FARM demo
 do
     local c = card(P_Farm, "Auto Farm", "Toggle demo — gantikan dengan logic game")
     local toggle = mk("TextButton", c, {Size=UDim2.fromOffset(48,26), Position=UDim2.new(1,-60,0,18), AnchorPoint=Vector2.new(1,0), BackgroundColor3=Color3.fromRGB(60,60,70), Text="", AutoButtonColor=false})
@@ -182,7 +201,7 @@ do
     end)
 end
 
--- Dragging + clamp
+-- Dragging window + clamp
 local dragging, dragStart, startPos
 local function clampToViewport(pos, size)
     local vw, vh = Camera.ViewportSize.X, Camera.ViewportSize.Y
@@ -209,7 +228,7 @@ local normalSize, normalPos = win.Size, win.Position
 btnMin.MouseButton1Click:Connect(function()
     win.Visible=false
     floatBtn.Visible=true
-    floatBtn.Position = UDim2.new(0.5, 0, 1, -20)
+    -- default center bottom; kalau sudah kamu geser, posisi terakhir akan disimpan
 end)
 btnMax.MouseButton1Click:Connect(function()
     if win.Size.X.Offset < 680 then
@@ -220,13 +239,38 @@ btnMax.MouseButton1Click:Connect(function()
 end)
 btnClose.MouseButton1Click:Connect(function() gui:Destroy() end)
 
--- Restore from floating button
+-- Restore dari tombol kecil
 floatBtn.MouseButton1Click:Connect(function()
     floatBtn.Visible=false
     win.Visible=true
 end)
 
--- Responsive
+-- Dragging tombol kecil (clamp biar gak keluar layar)
+local draggingF, dragStartF, startPosF
+floatBtn.InputBegan:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.MouseButton1 then
+        draggingF = true
+        dragStartF = i.Position
+        startPosF = floatBtn.Position
+        i.Changed:Connect(function()
+            if i.UserInputState==Enum.UserInputState.End then
+                draggingF = false
+            end
+        end)
+    end
+end)
+UIS.InputChanged:Connect(function(i)
+    if draggingF and i.UserInputType==Enum.UserInputType.MouseMovement then
+        local d = i.Position - dragStartF
+        local vw, vh = Camera.ViewportSize.X, Camera.ViewportSize.Y
+        local bw, bh = floatBtn.AbsoluteSize.X, floatBtn.AbsoluteSize.Y
+        local nx = math.clamp(startPosF.X.Offset + d.X, bw/2, vw - bw/2)
+        local ny = math.clamp(startPosF.Y.Offset + d.Y, bh, vh) -- anchorY=1
+        floatBtn.Position = UDim2.fromOffset(nx, ny)
+    end
+end)
+
+-- Responsive (window + clamp posisi tombol kecil)
 Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
     if win.Visible then
         win.Size = getWindowSize()
@@ -234,8 +278,12 @@ Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
         win.Position = UDim2.fromScale(.5,.5)
         normalPos = win.Position
     else
-        floatBtn.Position = UDim2.new(0.5, 0, 1, -20)
+        local vw, vh = Camera.ViewportSize.X, Camera.ViewportSize.Y
+        local bw, bh = floatBtn.AbsoluteSize.X, floatBtn.AbsoluteSize.Y
+        local x = math.clamp(floatBtn.Position.X.Offset, bw/2, vw - bw/2)
+        local y = math.clamp(floatBtn.Position.Y.Offset, bh, vh)
+        floatBtn.Position = UDim2.fromOffset(x, y)
     end
 end)
 
-print("[Kucing Hub] UI loaded v0.6.1")
+print("[Kucing Hub] UI loaded v0.7")
