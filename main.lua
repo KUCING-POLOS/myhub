@@ -1,6 +1,3 @@
--- Kucing Hub v0.7 — single file (UI + drag/min/max/close + draggable floating GitHub avatar)
--- Tempel ke main.lua kamu
-
 -- Services
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -25,7 +22,6 @@ local TEXT = Color3.fromRGB(235,238,245)
 local SUB  = Color3.fromRGB(170,176,190)
 local ACC  = Color3.fromRGB(92,156,255)
 
--- Bersihin UI lama
 local old = CoreGui:FindFirstChild("KucingHubUI")
 if old then old:Destroy() end
 
@@ -46,7 +42,7 @@ local floatBtn = mk("ImageButton", gui, {
     Name="KucingFloat",
     Size = UDim2.fromOffset(40,40),
     AnchorPoint = Vector2.new(0.5,1),
-    Position = UDim2.new(0.5, 0, 1, -20), -- default tengah bawah
+    Position = UDim2.new(0.5, 0, 1, -20), 
     BackgroundColor3 = PANEL,
     AutoButtonColor = true,
     Visible = false,
@@ -54,7 +50,6 @@ local floatBtn = mk("ImageButton", gui, {
 })
 corner(floatBtn,20); stroke(floatBtn,1)
 
--- Coba load avatar GitHub -> file lokal -> getcustomasset (butuh dukungan executor)
 local http = (syn and syn.request) or request or http_request
 local getasset = getcustomasset or getsynasset
 local function tryLoadGithubAvatar()
@@ -72,14 +67,14 @@ local function tryLoadGithubAvatar()
     return true
 end
 if not tryLoadGithubAvatar() then
-    -- fallback ke avatar Roblox kalau executor gak support custom asset
+    
     local ok, img = pcall(function()
         return Players:GetUserThumbnailAsync(Players.LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
     end)
     if ok then floatBtn.Image = img end
 end
 
--- Window (clip children biar rapi)
+
 local win = mk("Frame", gui, {
     Name="Window",
     BackgroundColor3 = PANEL,
@@ -111,7 +106,7 @@ corner(btnMin,8); stroke(btnMin,1); corner(btnMax,8); stroke(btnMax,1); corner(b
 -- Body layout
 local body = mk("Frame", win, {Size=UDim2.new(1,0,1,-44), Position=UDim2.fromOffset(0,40), BackgroundTransparency=1})
 
--- Sidebar scroll + clip (biar tab terakhir gak nembus)
+-- Sidebar scroll + clip 
 local sidebar = mk("ScrollingFrame", body, {
     Size=UDim2.new(0,116,1,0),
     BackgroundColor3=BG,
@@ -174,7 +169,7 @@ local P_Misc   = addPage("Misc")
 local P_Visual = addPage("Visual")
 addTab("Main"); addTab("Farm"); addTab("Shop"); addTab("Pet"); addTab("Utility"); addTab("Misc"); addTab("Visual")
 
--- Content contoh
+-- 
 card(P_Main, "Information", "Kucing Hub v0.7")
 
 -- FARM demo
@@ -228,7 +223,7 @@ local normalSize, normalPos = win.Size, win.Position
 btnMin.MouseButton1Click:Connect(function()
     win.Visible=false
     floatBtn.Visible=true
-    -- default center bottom; kalau sudah kamu geser, posisi terakhir akan disimpan
+    
 end)
 btnMax.MouseButton1Click:Connect(function()
     if win.Size.X.Offset < 680 then
@@ -239,13 +234,12 @@ btnMax.MouseButton1Click:Connect(function()
 end)
 btnClose.MouseButton1Click:Connect(function() gui:Destroy() end)
 
--- Restore dari tombol kecil
+
 floatBtn.MouseButton1Click:Connect(function()
     floatBtn.Visible=false
     win.Visible=true
 end)
 
--- Dragging tombol kecil (clamp biar gak keluar layar)
 local draggingF, dragStartF, startPosF
 floatBtn.InputBegan:Connect(function(i)
     if i.UserInputType==Enum.UserInputType.MouseButton1 then
@@ -270,7 +264,6 @@ UIS.InputChanged:Connect(function(i)
     end
 end)
 
--- Responsive (window + clamp posisi tombol kecil)
 Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
     if win.Visible then
         win.Size = getWindowSize()
@@ -286,4 +279,4 @@ Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
     end
 end)
 
-print("[Kucing Hub] UI loaded v0.7")
+print("[Kucing Hub] ")
