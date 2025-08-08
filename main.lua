@@ -1,3 +1,7 @@
+-- Kucing Hub v1.0 — single file
+-- UI + draggable/min/max/close + draggable floating GitHub avatar (fallback Roblox)
+-- Main > Character: collapsible, slider WalkSpeed/JumpPower, Fly, Anti-AFK, NoClip, Infinite Jump
+-- Shop & Misc UI mirip yang kamu kirim (callback masih placeholder)
 
 -- ===== Services =====
 local Players = game:GetService("Players")
@@ -79,7 +83,7 @@ local header = mk("Frame", win, {Size=UDim2.new(1,0,0,36), BackgroundColor3=PANE
 corner(header,10); stroke(header,1)
 mk("TextLabel", header, {
     BackgroundTransparency=1, Size=UDim2.new(1,-120,1,0), Position=UDim2.fromOffset(10,0),
-    Font=Enum.Font.GothamBold, Text="Kucing Hub | v0.9", TextColor3=TEXT, TextSize=16, TextXAlignment=Enum.TextXAlignment.Left
+    Font=Enum.Font.GothamBold, Text="Kucing Hub | v1.0", TextColor3=TEXT, TextSize=16, TextXAlignment=Enum.TextXAlignment.Left
 })
 local btnMin = mk("TextButton", header, {Size=UDim2.fromOffset(22,22), Position=UDim2.new(1,-70,0,7), AnchorPoint=Vector2.new(1,0), Text="–", TextColor3=TEXT, BackgroundColor3=Color3.fromRGB(50,50,58), Font=Enum.Font.GothamBold, TextSize=16})
 local btnMax = mk("TextButton", header, {Size=UDim2.fromOffset(22,22), Position=UDim2.new(1,-44,0,7), AnchorPoint=Vector2.new(1,0), Text="□", TextColor3=TEXT, BackgroundColor3=Color3.fromRGB(50,50,58), Font=Enum.Font.GothamBold, TextSize=14})
@@ -173,7 +177,6 @@ local function addSlider(parent, label, min, max, start, onChange)
         valLb.Text = tostring(value)
         if onChange then onChange(value) end
     end
-    -- init
     setPct((value-min)/(max-min))
 
     local dragging = false
@@ -189,6 +192,7 @@ local function addSlider(parent, label, min, max, start, onChange)
     return {set=function(v) v=math.clamp(v,min,max); setPct((v-min)/(max-min)) end, get=function() return value end}
 end
 
+-- Toggle
 local function addToggle(parent, label, default, onToggle)
     local f = mk("Frame", parent, {Size=UDim2.new(1,-6,0,44), BackgroundColor3=PANEL}); corner(f,10); stroke(f,1)
     mk("TextLabel", f, {BackgroundTransparency=1, Text=label, Font=Enum.Font.GothamSemibold, TextSize=14, TextColor3=TEXT, Size=UDim2.new(1,-80,1,0), Position=UDim2.fromOffset(10,0), TextXAlignment=Enum.TextXAlignment.Left})
@@ -199,6 +203,71 @@ local function addToggle(parent, label, default, onToggle)
     toggle.MouseButton1Click:Connect(function() on = not on; render(); if onToggle then onToggle(on) end end)
     render()
     return {set=function(v) on=not not v; render(); if onToggle then onToggle(on) end end, get=function() return on end}
+end
+
+-- Button
+local function addButton(parent, label, onClick)
+  local f = Instance.new("Frame", parent)
+  f.Size = UDim2.new(1,-6,0,40); f.BackgroundColor3 = PANEL
+  corner(f,10); stroke(f,1)
+  local b = Instance.new("TextButton", f)
+  b.Size = UDim2.new(1,-12,1,-10); b.Position = UDim2.fromOffset(6,5)
+  b.Text = label; b.Font = Enum.Font.GothamSemibold; b.TextSize = 14
+  b.TextColor3 = TEXT; b.BackgroundColor3 = Color3.fromRGB(50,50,58)
+  corner(b,8); stroke(b,1)
+  b.MouseButton1Click:Connect(function() if onClick then onClick() end end)
+  return b
+end
+
+-- Dropdown
+local function addDropdown(parent, label, options, defaultIndex, onChange)
+    options = options or {}
+    local f = mk("Frame", parent, {Size=UDim2.new(1,-6,0,56), BackgroundColor3=PANEL}); corner(f,10); stroke(f,1)
+    mk("TextLabel", f, {BackgroundTransparency=1, Text=label, Font=Enum.Font.GothamSemibold, TextSize=14,
+        TextColor3=TEXT, Size=UDim2.new(1,-70,0,18), Position=UDim2.fromOffset(10,6), TextXAlignment=Enum.TextXAlignment.Left})
+
+    local btn = mk("TextButton", f, {Size=UDim2.new(1,-20,0,26), Position=UDim2.fromOffset(10,28), Text="", BackgroundColor3=Color3.fromRGB(40,42,50), AutoButtonColor=false})
+    corner(btn,8); stroke(btn,1)
+    local txt = mk("TextLabel", btn, {Size=UDim2.new(1,-30,1,0), Position=UDim2.fromOffset(10,0), BackgroundTransparency=1, Text="Select", Font=Enum.Font.Gotham, TextSize=13, TextColor3=TEXT, TextXAlignment=Enum.TextXAlignment.Left})
+    mk("TextLabel", btn, {Size=UDim2.fromOffset(20,20), Position=UDim2.new(1,-20,0.5,-10), BackgroundTransparency=1, Text="▾", TextColor3=SUB, Font=Enum.Font.GothamBold, TextSize=14})
+
+    local listFrame = mk("Frame", f, {Visible=false, BackgroundColor3=PANEL, Position=UDim2.fromOffset(10,56), Size=UDim2.new(1,-20,0, math.min(#options,6)*26 + 8)})
+    corner(listFrame,8); stroke(listFrame,1)
+    local sf = mk("ScrollingFrame", listFrame, {Size=UDim2.fromScale(1,1), CanvasSize=UDim2.new(0,0,0,0), BackgroundTransparency=1, ScrollBarThickness=4})
+    local l = mk("UIListLayout", sf, {Padding=UDim.new(0,4), SortOrder=Enum.SortOrder.LayoutOrder})
+    mk("UIPadding", sf, {PaddingTop=UDim.new(0,4), PaddingLeft=UDim.new(0,4), PaddingRight=UDim.new(0,4), PaddingBottom=UDim.new(0,4)})
+    l:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() sf.CanvasSize = UDim2.new(0,0,0,l.AbsoluteContentSize.Y+8) end)
+
+    local value, index = nil, defaultIndex or 1
+    local function setIndex(i)
+        index = math.clamp(i,1,math.max(1,#options))
+        value = options[index]
+        txt.Text = tostring(value or "Select")
+        if onChange then onChange(value) end
+    end
+
+    for i,opt in ipairs(options) do
+        local item = mk("TextButton", sf, {Size=UDim2.new(1,-8,0,22), Text=tostring(opt), BackgroundColor3=Color3.fromRGB(44,46,54), TextColor3=TEXT, Font=Enum.Font.Gotham, TextSize=13, AutoButtonColor=true})
+        corner(item,6); stroke(item,1)
+        item.MouseButton1Click:Connect(function() setIndex(i); listFrame.Visible=false end)
+    end
+    btn.MouseButton1Click:Connect(function() listFrame.Visible = not listFrame.Visible end)
+    UIS.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 and listFrame.Visible and not listFrame:IsAncestorOf(i.Target) and i.Target~=btn then listFrame.Visible=false end end)
+
+    setIndex(index)
+    return {set=function(v) local ii = table.find(options, v); if ii then setIndex(ii) end end, get=function() return value end}
+end
+
+-- Number Input
+local function addNumberInput(parent, label, placeholder, default, onChange)
+    local f = mk("Frame", parent, {Size=UDim2.new(1,-6,0,56), BackgroundColor3=PANEL}); corner(f,10); stroke(f,1)
+    mk("TextLabel", f, {BackgroundTransparency=1, Text=label, Font=Enum.Font.GothamSemibold, TextSize=14,
+        TextColor3=TEXT, Size=UDim2.new(1,-110,0,18), Position=UDim2.fromOffset(10,6), TextXAlignment=Enum.TextXAlignment.Left})
+    local box = mk("TextBox", f, {Size=UDim2.new(0,140,0,26), Position=UDim2.new(1,-150,0,26), PlaceholderText=placeholder or "Ex: 20", Text=tostring(default or ""), Font=Enum.Font.Gotham, TextSize=13, TextColor3=TEXT, PlaceholderColor3=SUB, BackgroundColor3=Color3.fromRGB(40,42,50), ClearTextOnFocus=false})
+    corner(box,8); stroke(box,1)
+    local function apply() local n = tonumber(box.Text); if n and onChange then onChange(n) end end
+    box.FocusLost:Connect(apply)
+    return {set=function(v) box.Text = tostring(v or "") end, get=function() return tonumber(box.Text) end}
 end
 
 -- Pages & Tabs
@@ -212,7 +281,7 @@ local P_Visual = addPage("Visual")
 addTab("Main"); addTab("Farm"); addTab("Shop"); addTab("Pet"); addTab("Utility"); addTab("Misc"); addTab("Visual")
 
 -- Info
-card(P_Main, "Information", "Kucing Hub v0.9")
+card(P_Main, "Information", "Kucing Hub v1.0")
 
 -- ===== Character (collapsible + slider) =====
 do
@@ -320,6 +389,68 @@ do
     end)
 end
 
+-- ===== SHOP =====
+do
+    local top = addCollapsibleCard(P_Shop, "Auto Sell Fruit", "", false)
+    addToggle(top, "Auto Sell Fruit", false, function(on) print("AutoSellFruit:", on) end)
+
+    local petCard = addCollapsibleCard(P_Shop, "Auto Sell Pet", "", false)
+    addToggle(petCard, "Auto Sell Pet", false, function(on) print("AutoSellPet:", on) end)
+
+    local buyCard = addCollapsibleCard(P_Shop, "Auto Buy", "", true)
+    addToggle(buyCard, "Auto Buy (stock)", false, function(on) print("AutoBuy:", on) end)
+
+    local seeds = {"All","Wheat","Carrot","Mango","Pumpkin"}
+    local gears = {"All","Hoe","Sprinkler","Rod"}
+    local eggs  = {"All","Common","Rare","Epic","Legendary"}
+
+    addDropdown(buyCard, "Select Seed", seeds, 1, function(v) print("Seed:", v) end)
+    addDropdown(buyCard, "Select Gear", gears, 1, function(v) print("Gear:", v) end)
+    addDropdown(buyCard, "Select Egg",  eggs,  1, function(v) print("Egg:", v) end)
+    addDropdown(buyCard, "Select Traveling Merchant Shop", {"Off","ItemA","ItemB","ItemC"}, 1, function(v) print("Merchant:", v) end)
+end
+
+-- ===== MISC =====
+do
+    card(P_Misc, "Tips", "Auto execute, jangan skip loading, webhook opsional")
+
+    addNumberInput(P_Misc, "Auto Rejoin Delay", "Ex: 20", "", function(n) print("RejoinDelay:", n) end)
+    addToggle(P_Misc, "Auto Rejoin", false, function(on) print("AutoRejoin:", on) end)
+
+    local midPet = addCollapsibleCard(P_Misc, "Middle Pet", "", false)
+    addButton(midPet, "Open", function() print("MiddlePet open") end)
+
+    local infSpr = addCollapsibleCard(P_Misc, "Inf Sprinkler", "", false)
+    addButton(infSpr, "Enable", function() print("InfSprinkler enable") end)
+
+    local steal  = addCollapsibleCard(P_Misc, "Steal", "", false)
+    addButton(steal, "Open", function() print("Steal open") end)
+
+    local seedPack = addCollapsibleCard(P_Misc, "Seed Pack", "", false)
+    addButton(seedPack, "Open", function() print("SeedPack open") end)
+
+    local perf = addCollapsibleCard(P_Misc, "Performance", "", true)
+    addToggle(perf, "Hide Plant", false, function(on) print("HidePlant:", on) end)
+    addToggle(perf, "Hide Fruit", false, function(on) print("HideFruit:", on) end)
+    addToggle(perf, "Remove Other Garden", false, function(on) print("RemoveGarden:", on) end)
+    addToggle(perf, "Boost FPS (one-way)", false, function(on)
+        if on then pcall(function()
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            game:GetService("Lighting").GlobalShadows = false
+        end) end
+        print("BoostFPS:", on)
+    end)
+    addToggle(perf, "Disable 3D Rendering", false, function(on)
+        pcall(function() RS:Set3dRenderingEnabled(not on) end)
+        print("Disable3D:", on)
+    end)
+    addToggle(perf, "Black Screen", false, function(on)
+        if not gui:FindFirstChild("BlackOverlay") then mk("Frame", gui, {Name="BlackOverlay", BackgroundColor3=Color3.new(0,0,0), Size=UDim2.fromScale(1,1), Visible=false, ZIndex=999}) end
+        gui.BlackOverlay.Visible = on
+        print("BlackScreen:", on)
+    end)
+end
+
 -- ===== Farm demo (placeholder) =====
 do
     local c = card(P_Farm, "Auto Farm", "Toggle demo — ganti dengan logic game kamu")
@@ -421,4 +552,4 @@ Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
     end
 end)
 
-print("[Kucing Hub] UI + Character loaded v0.9")
+print("[Kucing Hub] loaded v1.0")
