@@ -1,7 +1,3 @@
--- Kucing Hub v1.0 — single file
--- UI + draggable/min/max/close + draggable floating GitHub avatar (fallback Roblox)
--- Main > Character: collapsible, slider WalkSpeed/JumpPower, Fly, Anti-AFK, NoClip, Infinite Jump
--- Shop & Misc UI mirip yang kamu kirim (callback masih placeholder)
 
 -- ===== Services =====
 local Players = game:GetService("Players")
@@ -41,6 +37,17 @@ local function getWindowSize()
     local h = math.clamp(math.floor(vh * 0.38), 240, 300)
     return UDim2.fromOffset(w, h)
 end
+
+-- ===== Dropdown Overlay (global) =====
+local DD_OVERLAY = Instance.new("TextButton")
+DD_OVERLAY.Name = "DDOverlay"
+DD_OVERLAY.BackgroundTransparency = 1
+DD_OVERLAY.AutoButtonColor = false
+DD_OVERLAY.Text = ""
+DD_OVERLAY.Visible = false
+DD_OVERLAY.Size = UDim2.fromScale(1,1)
+DD_OVERLAY.ZIndex = 999
+DD_OVERLAY.Parent = gui
 
 -- ===== Floating restore button (GitHub avatar + draggable) =====
 local GITHUB_USER = "KUCING-POLOS" -- ubah kalau beda
@@ -83,7 +90,7 @@ local header = mk("Frame", win, {Size=UDim2.new(1,0,0,36), BackgroundColor3=PANE
 corner(header,10); stroke(header,1)
 mk("TextLabel", header, {
     BackgroundTransparency=1, Size=UDim2.new(1,-120,1,0), Position=UDim2.fromOffset(10,0),
-    Font=Enum.Font.GothamBold, Text="Kucing Hub | v1.0", TextColor3=TEXT, TextSize=16, TextXAlignment=Enum.TextXAlignment.Left
+    Font=Enum.Font.GothamBold, Text="Kucing Hub | v1.1", TextColor3=TEXT, TextSize=16, TextXAlignment=Enum.TextXAlignment.Left
 })
 local btnMin = mk("TextButton", header, {Size=UDim2.fromOffset(22,22), Position=UDim2.new(1,-70,0,7), AnchorPoint=Vector2.new(1,0), Text="–", TextColor3=TEXT, BackgroundColor3=Color3.fromRGB(50,50,58), Font=Enum.Font.GothamBold, TextSize=16})
 local btnMax = mk("TextButton", header, {Size=UDim2.fromOffset(22,22), Position=UDim2.new(1,-44,0,7), AnchorPoint=Vector2.new(1,0), Text="□", TextColor3=TEXT, BackgroundColor3=Color3.fromRGB(50,50,58), Font=Enum.Font.GothamBold, TextSize=14})
@@ -219,43 +226,110 @@ local function addButton(parent, label, onClick)
   return b
 end
 
--- Dropdown
+-- Dropdown (FIX: overlay + root + ZIndex + freeze scroll)
 local function addDropdown(parent, label, options, defaultIndex, onChange)
     options = options or {}
-    local f = mk("Frame", parent, {Size=UDim2.new(1,-6,0,56), BackgroundColor3=PANEL}); corner(f,10); stroke(f,1)
-    mk("TextLabel", f, {BackgroundTransparency=1, Text=label, Font=Enum.Font.GothamSemibold, TextSize=14,
-        TextColor3=TEXT, Size=UDim2.new(1,-70,0,18), Position=UDim2.fromOffset(10,6), TextXAlignment=Enum.TextXAlignment.Left})
 
-    local btn = mk("TextButton", f, {Size=UDim2.new(1,-20,0,26), Position=UDim2.fromOffset(10,28), Text="", BackgroundColor3=Color3.fromRGB(40,42,50), AutoButtonColor=false})
+    local f = mk("Frame", parent, {Size=UDim2.new(1,-6,0,56), BackgroundColor3=PANEL})
+    corner(f,10); stroke(f,1); f.ZIndex = 40
+
+    mk("TextLabel", f, {
+        BackgroundTransparency=1, Text=label, Font=Enum.Font.GothamSemibold, TextSize=14,
+        TextColor3=TEXT, Size=UDim2.new(1,-70,0,18), Position=UDim2.fromOffset(10,6),
+        TextXAlignment=Enum.TextXAlignment.Left, ZIndex = 41
+    })
+
+    local btn = mk("TextButton", f, {
+        Size=UDim2.new(1,-20,0,26), Position=UDim2.fromOffset(10,28),
+        Text="", BackgroundColor3=Color3.fromRGB(40,42,50), AutoButtonColor=false, ZIndex=42
+    })
     corner(btn,8); stroke(btn,1)
-    local txt = mk("TextLabel", btn, {Size=UDim2.new(1,-30,1,0), Position=UDim2.fromOffset(10,0), BackgroundTransparency=1, Text="Select", Font=Enum.Font.Gotham, TextSize=13, TextColor3=TEXT, TextXAlignment=Enum.TextXAlignment.Left})
-    mk("TextLabel", btn, {Size=UDim2.fromOffset(20,20), Position=UDim2.new(1,-20,0.5,-10), BackgroundTransparency=1, Text="▾", TextColor3=SUB, Font=Enum.Font.GothamBold, TextSize=14})
 
-    local listFrame = mk("Frame", f, {Visible=false, BackgroundColor3=PANEL, Position=UDim2.fromOffset(10,56), Size=UDim2.new(1,-20,0, math.min(#options,6)*26 + 8)})
+    local txt = mk("TextLabel", btn, {
+        Size=UDim2.new(1,-30,1,0), Position=UDim2.fromOffset(10,0),
+        BackgroundTransparency=1, Text="Select", Font=Enum.Font.Gotham, TextSize=13,
+        TextColor3=TEXT, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=43
+    })
+    mk("TextLabel", btn, {
+        Size=UDim2.fromOffset(20,20), Position=UDim2.new(1,-20,0.5,-10),
+        BackgroundTransparency=1, Text="▾", TextColor3=SUB, Font=Enum.Font.GothamBold,
+        TextSize=14, ZIndex=43
+    })
+
+    -- list di root (supaya gak ke-clip) + ZIndex tinggi
+    local listFrame = mk("Frame", gui, {Visible=false, BackgroundColor3=PANEL, ZIndex=100})
     corner(listFrame,8); stroke(listFrame,1)
-    local sf = mk("ScrollingFrame", listFrame, {Size=UDim2.fromScale(1,1), CanvasSize=UDim2.new(0,0,0,0), BackgroundTransparency=1, ScrollBarThickness=4})
+
+    local sf = mk("ScrollingFrame", listFrame, {
+        Size=UDim2.fromScale(1,1), CanvasSize=UDim2.new(0,0,0,0),
+        BackgroundTransparency=1, ScrollBarThickness=4, ZIndex=101
+    })
     local l = mk("UIListLayout", sf, {Padding=UDim.new(0,4), SortOrder=Enum.SortOrder.LayoutOrder})
     mk("UIPadding", sf, {PaddingTop=UDim.new(0,4), PaddingLeft=UDim.new(0,4), PaddingRight=UDim.new(0,4), PaddingBottom=UDim.new(0,4)})
-    l:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() sf.CanvasSize = UDim2.new(0,0,0,l.AbsoluteContentSize.Y+8) end)
+    l:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        sf.CanvasSize = UDim2.new(0,0,0, l.AbsoluteContentSize.Y+8)
+    end)
 
     local value, index = nil, defaultIndex or 1
     local function setIndex(i)
         index = math.clamp(i,1,math.max(1,#options))
-        value = options[index]
-        txt.Text = tostring(value or "Select")
+        value = options[index]; txt.Text = tostring(value or "Select")
         if onChange then onChange(value) end
     end
 
     for i,opt in ipairs(options) do
-        local item = mk("TextButton", sf, {Size=UDim2.new(1,-8,0,22), Text=tostring(opt), BackgroundColor3=Color3.fromRGB(44,46,54), TextColor3=TEXT, Font=Enum.Font.Gotham, TextSize=13, AutoButtonColor=true})
+        local item = mk("TextButton", sf, {
+            Size=UDim2.new(1,-8,0,22), Text=tostring(opt),
+            BackgroundColor3=Color3.fromRGB(44,46,54), TextColor3=TEXT,
+            Font=Enum.Font.Gotham, TextSize=13, AutoButtonColor=true, ZIndex=102
+        })
         corner(item,6); stroke(item,1)
-        item.MouseButton1Click:Connect(function() setIndex(i); listFrame.Visible=false end)
+        item.MouseButton1Click:Connect(function()
+            setIndex(i)
+            listFrame.Visible=false; DD_OVERLAY.Visible=false
+            local page = parent
+            while page and not page:IsA("ScrollingFrame") do page = page.Parent end
+            if page then page.ScrollingEnabled = true end
+        end)
     end
-    btn.MouseButton1Click:Connect(function() listFrame.Visible = not listFrame.Visible end)
-    UIS.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 and listFrame.Visible and not listFrame:IsAncestorOf(i.Target) and i.Target~=btn then listFrame.Visible=false end end)
+
+    local function openList()
+        local absPos = btn.AbsolutePosition
+        local absSize = btn.AbsoluteSize
+        listFrame.Position = UDim2.fromOffset(absPos.X, absPos.Y + absSize.Y + 4)
+        listFrame.Size     = UDim2.fromOffset(absSize.X, math.min(#options,6)*26 + 8)
+
+        DD_OVERLAY.Visible = true
+        listFrame.Visible  = true
+
+        local page = parent
+        while page and not page:IsA("ScrollingFrame") do page = page.Parent end
+        if page then page.ScrollingEnabled = false end
+    end
+    local function closeList()
+        listFrame.Visible=false
+        DD_OVERLAY.Visible=false
+        local page = parent
+        while page and not page:IsA("ScrollingFrame") do page = page.Parent end
+        if page then page.ScrollingEnabled = true end
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        if listFrame.Visible then closeList() else openList() end
+    end)
+    DD_OVERLAY.MouseButton1Click:Connect(closeList)
 
     setIndex(index)
-    return {set=function(v) local ii = table.find(options, v); if ii then setIndex(ii) end end, get=function() return value end}
+    Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+        if listFrame.Visible then
+            local absPos = btn.AbsolutePosition
+            local absSize = btn.AbsoluteSize
+            listFrame.Position = UDim2.fromOffset(absPos.X, absPos.Y + absSize.Y + 4)
+            listFrame.Size     = UDim2.fromOffset(absSize.X, listFrame.Size.Y.Offset)
+        end
+    end)
+
+    return {set=function(v) local i = table.find(options, v); if i then setIndex(i) end end, get=function() return value end}
 end
 
 -- Number Input
@@ -281,25 +355,22 @@ local P_Visual = addPage("Visual")
 addTab("Main"); addTab("Farm"); addTab("Shop"); addTab("Pet"); addTab("Utility"); addTab("Misc"); addTab("Visual")
 
 -- Info
-card(P_Main, "Information", "Kucing Hub v1.0")
+card(P_Main, "Information", "Kucing Hub v1.1")
 
--- ===== Character (collapsible + slider) =====
+-- ===== Character =====
 do
     local content = addCollapsibleCard(P_Main, "Character", "Basic movement & utility", true)
 
-    -- Walk Speed
     addSlider(content, "Walk Speed", 8, 200, 16, function(v)
         local h = (LP.Character or LP.CharacterAdded:Wait()):FindFirstChildOfClass("Humanoid")
         if h then h.WalkSpeed = v end
     end)
 
-    -- Jump Power
     addSlider(content, "Jump Power", 20, 200, 50, function(v)
         local h = (LP.Character or LP.CharacterAdded:Wait()):FindFirstChildOfClass("Humanoid")
         if h then h.UseJumpPower = true; h.JumpPower = v end
     end)
 
-    -- Fly
     local flyConn, flying = {}, false
     local function stopFly()
         flying = false
@@ -335,14 +406,16 @@ do
         end))
         table.insert(flyConn, RS.RenderStepped:Connect(function()
             if not flying then return end
-            bg.CFrame = Camera.CFrame
+            local cam = workspace.CurrentCamera
+            if not cam then return end
+            bg.CFrame = cam.CFrame
             local h = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
             local speed = (h and h.WalkSpeed or 16) * 1.2
             local dir = Vector3.new()
-            if keys.W then dir += Camera.CFrame.LookVector end
-            if keys.S then dir -= Camera.CFrame.LookVector end
-            if keys.A then dir -= Camera.CFrame.RightVector end
-            if keys.D then dir += Camera.CFrame.RightVector end
+            if keys.W then dir += cam.CFrame.LookVector end
+            if keys.S then dir -= cam.CFrame.LookVector end
+            if keys.A then dir -= cam.CFrame.RightVector end
+            if keys.D then dir += cam.CFrame.RightVector end
             if keys.Up then dir += Vector3.new(0,1,0) end
             if keys.Down then dir -= Vector3.new(0,1,0) end
             bv.Velocity = dir.Magnitude>0 and dir.Unit*speed or Vector3.new()
@@ -350,7 +423,6 @@ do
     end
     addToggle(content, "Fly (WASD + Space/Shift)", false, function(on) if on then startFly() else stopFly() end end)
 
-    -- Anti AFK
     local afkConn
     addToggle(content, "Anti AFK", true, function(on)
         if afkConn then afkConn:Disconnect(); afkConn=nil end
@@ -360,7 +432,6 @@ do
         end
     end)
 
-    -- No Clip
     local noclipConn
     addToggle(content, "No Clip", false, function(on)
         if noclipConn then noclipConn:Disconnect(); noclipConn=nil end
@@ -376,7 +447,6 @@ do
         end
     end)
 
-    -- Infinite Jump
     local infConn
     addToggle(content, "Infinite Jump", false, function(on)
         if infConn then infConn:Disconnect(); infConn=nil end
@@ -552,4 +622,4 @@ Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
     end
 end)
 
-print("[Kucing Hub] loaded v1.0")
+print("[Kucing Hub] loaded v1.1")
