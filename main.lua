@@ -1,5 +1,3 @@
--- Kucing Hub v0.4 — Window with Minimize/Maximize/Close + Floating Profile Button
--- Executor-ready (Delta/Ronix). Salin ke main.lua
 
 -- Services
 local Players = game:GetService("Players")
