@@ -17,12 +17,8 @@ local function mk(class, parent, props)
 end
 local function corner(inst, r) mk("UICorner", inst, {CornerRadius = UDim.new(0, r or 12)}) end
 local function stroke(inst, t) mk("UIStroke", inst, {Color = Color3.fromRGB(60,60,70), Thickness = t or 1}) end
-local function safeHumanoid()
-    local c = LP.Character or LP.CharacterAdded:Wait()
-    return c:FindFirstChildOfClass("Humanoid"), c
-end
 
--- ===== Theme =====
+-- Theme
 local BG   = Color3.fromRGB(24, 26, 32)
 local PANEL= Color3.fromRGB(36, 38, 46)
 local TEXT = Color3.fromRGB(235,238,245)
@@ -43,7 +39,7 @@ local function getWindowSize()
 end
 
 -- ===== Floating restore button (GitHub avatar + draggable) =====
-local GITHUB_USER = "KUCING-POLOS"
+local GITHUB_USER = "KUCING-POLOS" -- ubah kalau beda
 local floatBtn = mk("ImageButton", gui, {
     Name="KucingFloat", Size = UDim2.fromOffset(40,40),
     AnchorPoint = Vector2.new(0.5,1), Position = UDim2.new(0.5, 0, 1, -20),
@@ -83,7 +79,7 @@ local header = mk("Frame", win, {Size=UDim2.new(1,0,0,36), BackgroundColor3=PANE
 corner(header,10); stroke(header,1)
 mk("TextLabel", header, {
     BackgroundTransparency=1, Size=UDim2.new(1,-120,1,0), Position=UDim2.fromOffset(10,0),
-    Font=Enum.Font.GothamBold, Text="Kucing Hub | v0.8", TextColor3=TEXT, TextSize=16, TextXAlignment=Enum.TextXAlignment.Left
+    Font=Enum.Font.GothamBold, Text="Kucing Hub | v0.9", TextColor3=TEXT, TextSize=16, TextXAlignment=Enum.TextXAlignment.Left
 })
 local btnMin = mk("TextButton", header, {Size=UDim2.fromOffset(22,22), Position=UDim2.new(1,-70,0,7), AnchorPoint=Vector2.new(1,0), Text="–", TextColor3=TEXT, BackgroundColor3=Color3.fromRGB(50,50,58), Font=Enum.Font.GothamBold, TextSize=16})
 local btnMax = mk("TextButton", header, {Size=UDim2.fromOffset(22,22), Position=UDim2.new(1,-44,0,7), AnchorPoint=Vector2.new(1,0), Text="□", TextColor3=TEXT, BackgroundColor3=Color3.fromRGB(50,50,58), Font=Enum.Font.GothamBold, TextSize=14})
@@ -134,32 +130,63 @@ local function card(parent, title, subtitle)
     return f
 end
 
--- Pages & Tabs
-local P_Main   = addPage("Main")
-local P_Farm   = addPage("Farm")
-local P_Shop   = addPage("Shop")
-local P_Pet    = addPage("Pet")
-local P_Utility= addPage("Utility")
-local P_Misc   = addPage("Misc")
-local P_Visual = addPage("Visual")
-addTab("Main"); addTab("Farm"); addTab("Shop"); addTab("Pet"); addTab("Utility"); addTab("Misc"); addTab("Visual")
+-- Collapsible card
+local function addCollapsibleCard(parent, title, subtitle, defaultOpen)
+    local wrap = mk("Frame", parent, {Size=UDim2.new(1,-6,0,52), BackgroundColor3=PANEL}); corner(wrap,10); stroke(wrap,1)
+    local hdr = mk("TextButton", wrap, {Size=UDim2.new(1,0,0,52), BackgroundTransparency=1, Text="", AutoButtonColor=false})
+    mk("TextLabel", hdr, {BackgroundTransparency=1, Text=title, Font=Enum.Font.GothamSemibold, TextSize=14, TextColor3=TEXT, Size=UDim2.new(1,-40,0,20), Position=UDim2.fromOffset(10,6), TextXAlignment=Enum.TextXAlignment.Left})
+    mk("TextLabel", hdr, {BackgroundTransparency=1, Text=subtitle or "", Font=Enum.Font.Gotham, TextSize=12, TextColor3=SUB, Size=UDim2.new(1,-40,0,16), Position=UDim2.fromOffset(10,28), TextXAlignment=Enum.TextXAlignment.Left})
+    local arrow = mk("TextLabel", hdr, {Size=UDim2.fromOffset(20,20), Position=UDim2.new(1,-28,0,16), BackgroundTransparency=1, Text="›", Font=Enum.Font.GothamBold, TextSize=18, TextColor3=SUB})
 
--- Info
-card(P_Main, "Information", "Kucing Hub v0.8")
+    local content = mk("Frame", wrap, {Size=UDim2.new(1,0,0,0), Position=UDim2.fromOffset(0,52), BackgroundTransparency=1, ClipsDescendants=true})
+    local cl = mk("UIListLayout", content, {Padding=UDim.new(0,6), SortOrder=Enum.SortOrder.LayoutOrder})
 
--- ===== UI widgets (stepper & toggle) =====
-local function addStepper(parent, label, min, max, step, start, onChange)
-    local f = mk("Frame", parent, {Size=UDim2.new(1,-6,0,44), BackgroundColor3=PANEL}); corner(f,10); stroke(f,1)
-    mk("TextLabel", f, {BackgroundTransparency=1, Text=label, Font=Enum.Font.GothamSemibold, TextSize=14, TextColor3=TEXT, Size=UDim2.new(1,-120,1,0), Position=UDim2.fromOffset(10,0), TextXAlignment=Enum.TextXAlignment.Left})
-    local minus = mk("TextButton", f, {Size=UDim2.fromOffset(28,28), Position=UDim2.new(1,-102,0.5,-14), Text="-", Font=Enum.Font.GothamBold, TextSize=16, BackgroundColor3=Color3.fromRGB(50,50,58), TextColor3=TEXT}); corner(minus,8); stroke(minus,1)
-    local valLb = mk("TextLabel", f, {Size=UDim2.fromOffset(48,28), Position=UDim2.new(1,-70,0.5,-14), BackgroundColor3=Color3.fromRGB(40,42,50), Text=tostring(start), Font=Enum.Font.Gotham, TextSize=14, TextColor3=TEXT}); corner(valLb,8); stroke(valLb,1)
-    local plus  = mk("TextButton", f, {Size=UDim2.fromOffset(28,28), Position=UDim2.new(1,-26,0.5,-14), Text="+", Font=Enum.Font.GothamBold, TextSize=16, BackgroundColor3=Color3.fromRGB(50,50,58), TextColor3=TEXT}); corner(plus,8); stroke(plus,1)
-    local value = math.clamp(start, min, max)
-    local function apply() valLb.Text = tostring(value); if onChange then onChange(value) end end
-    minus.MouseButton1Click:Connect(function() value = math.clamp(value - step, min, max); apply() end)
-    plus.MouseButton1Click:Connect(function()  value = math.clamp(value + step, min, max); apply() end)
-    apply()
-    return {set=function(v) value=math.clamp(v,min,max); apply() end, get=function() return value end}
+    local open = (defaultOpen ~= false)
+    local function layout()
+        local h = open and (52 + cl.AbsoluteContentSize.Y + 12) or 52
+        wrap.Size = UDim2.new(1,-6,0,h)
+        content.Size = UDim2.new(1,0,0, open and (cl.AbsoluteContentSize.Y + 12) or 0)
+        arrow.Rotation = open and 90 or 0
+    end
+    cl:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(layout)
+    hdr.MouseButton1Click:Connect(function() open = not open; layout() end)
+    layout()
+    return content
+end
+
+-- Slider
+local function addSlider(parent, label, min, max, start, onChange)
+    local f = mk("Frame", parent, {Size=UDim2.new(1,-6,0,56), BackgroundColor3=PANEL}); corner(f,10); stroke(f,1)
+    mk("TextLabel", f, {BackgroundTransparency=1, Text=label, Font=Enum.Font.GothamSemibold, TextSize=14, TextColor3=TEXT, Size=UDim2.new(1,-90,0,18), Position=UDim2.fromOffset(10,6), TextXAlignment=Enum.TextXAlignment.Left})
+    local valLb = mk("TextLabel", f, {BackgroundTransparency=1, Text=tostring(start), Font=Enum.Font.Gotham, TextSize=13, TextColor3=SUB, Size=UDim2.new(0,80,0,18), Position=UDim2.new(1,-86,0,6), TextXAlignment=Enum.TextXAlignment.Right})
+
+    local track = mk("Frame", f, {Size=UDim2.new(1,-24,0,8), Position=UDim2.fromOffset(12,36), BackgroundColor3=Color3.fromRGB(45,48,58)}); corner(track,4)
+    local fill  = mk("Frame", track, {Size=UDim2.fromScale(0,1), BackgroundColor3=ACC}); corner(fill,4)
+    local knob  = mk("Frame", track, {Size=UDim2.fromOffset(12,12), BackgroundColor3=Color3.fromRGB(255,255,255), AnchorPoint=Vector2.new(.5,.5)}); corner(knob,6); stroke(knob,1)
+
+    local value = math.clamp(tonumber(start) or min, min, max)
+    local function setPct(p)
+        p = math.clamp(p, 0, 1)
+        fill.Size = UDim2.fromScale(p,1)
+        knob.Position = UDim2.fromScale(p,.5)
+        value = math.floor(min + (max-min)*p + 0.5)
+        valLb.Text = tostring(value)
+        if onChange then onChange(value) end
+    end
+    -- init
+    setPct((value-min)/(max-min))
+
+    local dragging = false
+    local function setFromMouseX(x)
+        local p = (x - track.AbsolutePosition.X)/track.AbsoluteSize.X
+        setPct(p)
+    end
+    track.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true; setFromMouseX(i.Position.X) end end)
+    knob.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true end end)
+    UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
+    UIS.InputChanged:Connect(function(i) if dragging and i.UserInputType==Enum.UserInputType.MouseMovement then setFromMouseX(i.Position.X) end end)
+
+    return {set=function(v) v=math.clamp(v,min,max); setPct((v-min)/(max-min)) end, get=function() return value end}
 end
 
 local function addToggle(parent, label, default, onToggle)
@@ -174,44 +201,55 @@ local function addToggle(parent, label, default, onToggle)
     return {set=function(v) on=not not v; render(); if onToggle then onToggle(on) end end, get=function() return on end}
 end
 
--- ===== Character (Main tab) =====
+-- Pages & Tabs
+local P_Main   = addPage("Main")
+local P_Farm   = addPage("Farm")
+local P_Shop   = addPage("Shop")
+local P_Pet    = addPage("Pet")
+local P_Utility= addPage("Utility")
+local P_Misc   = addPage("Misc")
+local P_Visual = addPage("Visual")
+addTab("Main"); addTab("Farm"); addTab("Shop"); addTab("Pet"); addTab("Utility"); addTab("Misc"); addTab("Visual")
+
+-- Info
+card(P_Main, "Information", "Kucing Hub v0.9")
+
+-- ===== Character (collapsible + slider) =====
 do
-    local chCard = card(P_Main, "Character", "Basic movement & utility")
-    chCard.Size = UDim2.new(1,-6,0,52) -- header only
-    -- Stepper WalkSpeed
-    local ws = addStepper(P_Main, "Walk Speed", 8, 200, 2, 16, function(v)
-        local h = safeHumanoid(); if h then h.WalkSpeed = v end
+    local content = addCollapsibleCard(P_Main, "Character", "Basic movement & utility", true)
+
+    -- Walk Speed
+    addSlider(content, "Walk Speed", 8, 200, 16, function(v)
+        local h = (LP.Character or LP.CharacterAdded:Wait()):FindFirstChildOfClass("Humanoid")
+        if h then h.WalkSpeed = v end
     end)
-    -- Stepper JumpPower
-    local jp = addStepper(P_Main, "Jump Power", 20, 200, 2, 50, function(v)
-        local h = safeHumanoid(); if h then h.JumpPower = v; h.UseJumpPower = true end
+
+    -- Jump Power
+    addSlider(content, "Jump Power", 20, 200, 50, function(v)
+        local h = (LP.Character or LP.CharacterAdded:Wait()):FindFirstChildOfClass("Humanoid")
+        if h then h.UseJumpPower = true; h.JumpPower = v end
     end)
 
     -- Fly
-    local flyConn = {}
-    local flying = false
+    local flyConn, flying = {}, false
     local function stopFly()
         flying = false
         for _,c in ipairs(flyConn) do pcall(function() c:Disconnect() end) end
         flyConn = {}
-        local h, char = safeHumanoid()
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            for _,inst in ipairs(char.HumanoidRootPart:GetChildren()) do
-                if inst:IsA("BodyGyro") or inst:IsA("BodyVelocity") then inst:Destroy() end
-            end
-        end
+        local char = LP.Character; if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+        for _,x in ipairs(hrp:GetChildren()) do if x:IsA("BodyGyro") or x:IsA("BodyVelocity") then x:Destroy() end end
     end
     local function startFly()
-        local h, char = safeHumanoid(); if not (h and char) then return end
+        local char = LP.Character or LP.CharacterAdded:Wait()
         local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
-        stopFly()
-        flying = true
+        stopFly(); flying = true
         local bg = Instance.new("BodyGyro", hrp); bg.P = 9e4; bg.MaxTorque = Vector3.new(9e9,9e9,9e9); bg.CFrame = hrp.CFrame
-        local bv = Instance.new("BodyVelocity", hrp); bv.MaxForce = Vector3.new(9e9,9e9,9e9); bv.Velocity = Vector3.new()
+        local bv = Instance.new("BodyVelocity", hrp); bv.MaxForce = Vector3.new(9e9,9e9,9e9)
         local keys = {W=false,S=false,A=false,D=false,Up=false,Down=false}
         table.insert(flyConn, UIS.InputBegan:Connect(function(i,g)
             if g then return end
-            if i.KeyCode==Enum.KeyCode.W then keys.W=true
+            if     i.KeyCode==Enum.KeyCode.W then keys.W=true
             elseif i.KeyCode==Enum.KeyCode.S then keys.S=true
             elseif i.KeyCode==Enum.KeyCode.A then keys.A=true
             elseif i.KeyCode==Enum.KeyCode.D then keys.D=true
@@ -219,7 +257,7 @@ do
             elseif i.KeyCode==Enum.KeyCode.LeftShift then keys.Down=true end
         end))
         table.insert(flyConn, UIS.InputEnded:Connect(function(i)
-            if i.KeyCode==Enum.KeyCode.W then keys.W=false
+            if     i.KeyCode==Enum.KeyCode.W then keys.W=false
             elseif i.KeyCode==Enum.KeyCode.S then keys.S=false
             elseif i.KeyCode==Enum.KeyCode.A then keys.A=false
             elseif i.KeyCode==Enum.KeyCode.D then keys.D=false
@@ -229,7 +267,8 @@ do
         table.insert(flyConn, RS.RenderStepped:Connect(function()
             if not flying then return end
             bg.CFrame = Camera.CFrame
-            local speed = (safeHumanoid() and safeHumanoid().WalkSpeed or 16) * 1.2
+            local h = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+            local speed = (h and h.WalkSpeed or 16) * 1.2
             local dir = Vector3.new()
             if keys.W then dir += Camera.CFrame.LookVector end
             if keys.S then dir -= Camera.CFrame.LookVector end
@@ -237,14 +276,14 @@ do
             if keys.D then dir += Camera.CFrame.RightVector end
             if keys.Up then dir += Vector3.new(0,1,0) end
             if keys.Down then dir -= Vector3.new(0,1,0) end
-            bv.Velocity = dir.Unit.Magnitude>0 and dir.Unit*speed or Vector3.new()
+            bv.Velocity = dir.Magnitude>0 and dir.Unit*speed or Vector3.new()
         end))
     end
-    addToggle(P_Main, "Fly (WASD + Space/Shift)", false, function(on) if on then startFly() else stopFly() end end)
+    addToggle(content, "Fly (WASD + Space/Shift)", false, function(on) if on then startFly() else stopFly() end end)
 
     -- Anti AFK
     local afkConn
-    addToggle(P_Main, "Anti AFK", true, function(on)
+    addToggle(content, "Anti AFK", true, function(on)
         if afkConn then afkConn:Disconnect(); afkConn=nil end
         if on then
             local vu = game:GetService("VirtualUser")
@@ -252,16 +291,16 @@ do
         end
     end)
 
-    -- NoClip
+    -- No Clip
     local noclipConn
-    addToggle(P_Main, "No Clip", false, function(on)
+    addToggle(content, "No Clip", false, function(on)
         if noclipConn then noclipConn:Disconnect(); noclipConn=nil end
         if on then
             noclipConn = RS.Stepped:Connect(function()
-                local _,char = safeHumanoid()
+                local char = LP.Character
                 if char then
                     for _,p in ipairs(char:GetDescendants()) do
-                        if p:IsA("BasePart") and p.CanCollide then p.CanCollide = false end
+                        if p:IsA("BasePart") then p.CanCollide = false end
                     end
                 end
             end)
@@ -270,19 +309,20 @@ do
 
     -- Infinite Jump
     local infConn
-    addToggle(P_Main, "Infinite Jump", false, function(on)
+    addToggle(content, "Infinite Jump", false, function(on)
         if infConn then infConn:Disconnect(); infConn=nil end
         if on then
             infConn = UIS.JumpRequest:Connect(function()
-                local h = safeHumanoid(); if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+                local h = (LP.Character or LP.CharacterAdded:Wait()):FindFirstChildOfClass("Humanoid")
+                if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
             end)
         end
     end)
 end
 
--- ===== (Example) Farm demo toggle =====
+-- ===== Farm demo (placeholder) =====
 do
-    local c = card(P_Farm, "Auto Farm", "Toggle demo — gantikan dengan logic game")
+    local c = card(P_Farm, "Auto Farm", "Toggle demo — ganti dengan logic game kamu")
     local toggle = mk("TextButton", c, {Size=UDim2.fromOffset(48,26), Position=UDim2.new(1,-60,0,18), AnchorPoint=Vector2.new(1,0), BackgroundColor3=Color3.fromRGB(60,60,70), Text="", AutoButtonColor=false})
     corner(toggle,14); stroke(toggle,1)
     local dot = mk("Frame", toggle, {Size=UDim2.fromOffset(22,22), Position=UDim2.fromOffset(2,2), BackgroundColor3=Color3.fromRGB(255,255,255)})
@@ -381,4 +421,4 @@ Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
     end
 end)
 
-print("[Kucing Hub] UI + Character loaded v0.8")
+print("[Kucing Hub] UI + Character loaded v0.9")
