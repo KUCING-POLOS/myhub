@@ -1,3 +1,6 @@
+-- Kucing Hub v1.2 — full single file
+-- UI + draggable/min/max/close + dropdown overlay fix
+-- Character, Auto Buy All (learn remote), Auto Sell Pet (filter), Auto Rejoin (same server)
 
 -- ===== Services =====
 local Players = game:GetService("Players")
@@ -6,6 +9,8 @@ local UIS = game:GetService("UserInputService")
 local RS = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Camera = workspace.CurrentCamera
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 local LP = Players.LocalPlayer
 
 -- ===== Helpers =====
@@ -25,7 +30,7 @@ local TEXT = Color3.fromRGB(235,238,245)
 local SUB  = Color3.fromRGB(170,176,190)
 local ACC  = Color3.fromRGB(92,156,255)
 
--- bersihin UI lama
+-- Bersihkan UI lama
 local old = CoreGui:FindFirstChild("KucingHubUI")
 if old then old:Destroy() end
 
@@ -90,7 +95,7 @@ local header = mk("Frame", win, {Size=UDim2.new(1,0,0,36), BackgroundColor3=PANE
 corner(header,10); stroke(header,1)
 mk("TextLabel", header, {
     BackgroundTransparency=1, Size=UDim2.new(1,-120,1,0), Position=UDim2.fromOffset(10,0),
-    Font=Enum.Font.GothamBold, Text="Kucing Hub | v1.1", TextColor3=TEXT, TextSize=16, TextXAlignment=Enum.TextXAlignment.Left
+    Font=Enum.Font.GothamBold, Text="Kucing Hub | v1.2", TextColor3=TEXT, TextSize=16, TextXAlignment=Enum.TextXAlignment.Left
 })
 local btnMin = mk("TextButton", header, {Size=UDim2.fromOffset(22,22), Position=UDim2.new(1,-70,0,7), AnchorPoint=Vector2.new(1,0), Text="–", TextColor3=TEXT, BackgroundColor3=Color3.fromRGB(50,50,58), Font=Enum.Font.GothamBold, TextSize=16})
 local btnMax = mk("TextButton", header, {Size=UDim2.fromOffset(22,22), Position=UDim2.new(1,-44,0,7), AnchorPoint=Vector2.new(1,0), Text="□", TextColor3=TEXT, BackgroundColor3=Color3.fromRGB(50,50,58), Font=Enum.Font.GothamBold, TextSize=14})
@@ -149,20 +154,20 @@ local function addCollapsibleCard(parent, title, subtitle, defaultOpen)
     mk("TextLabel", hdr, {BackgroundTransparency=1, Text=subtitle or "", Font=Enum.Font.Gotham, TextSize=12, TextColor3=SUB, Size=UDim2.new(1,-40,0,16), Position=UDim2.fromOffset(10,28), TextXAlignment=Enum.TextXAlignment.Left})
     local arrow = mk("TextLabel", hdr, {Size=UDim2.fromOffset(20,20), Position=UDim2.new(1,-28,0,16), BackgroundTransparency=1, Text="›", Font=Enum.Font.GothamBold, TextSize=18, TextColor3=SUB})
 
-    local content = mk("Frame", wrap, {Size=UDim2.new(1,0,0,0), Position=UDim2.fromOffset(0,52), BackgroundTransparency=1, ClipsDescendants=true})
-    local cl = mk("UIListLayout", content, {Padding=UDim.new(0,6), SortOrder=Enum.SortOrder.LayoutOrder})
+    local contentF = mk("Frame", wrap, {Size=UDim2.new(1,0,0,0), Position=UDim2.fromOffset(0,52), BackgroundTransparency=1, ClipsDescendants=true})
+    local cl = mk("UIListLayout", contentF, {Padding=UDim.new(0,6), SortOrder=Enum.SortOrder.LayoutOrder})
 
     local open = (defaultOpen ~= false)
     local function layout()
         local h = open and (52 + cl.AbsoluteContentSize.Y + 12) or 52
         wrap.Size = UDim2.new(1,-6,0,h)
-        content.Size = UDim2.new(1,0,0, open and (cl.AbsoluteContentSize.Y + 12) or 0)
+        contentF.Size = UDim2.new(1,0,0, open and (cl.AbsoluteContentSize.Y + 12) or 0)
         arrow.Rotation = open and 90 or 0
     end
     cl:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(layout)
     hdr.MouseButton1Click:Connect(function() open = not open; layout() end)
     layout()
-    return content
+    return contentF
 end
 
 -- Slider
@@ -332,16 +337,153 @@ local function addDropdown(parent, label, options, defaultIndex, onChange)
     return {set=function(v) local i = table.find(options, v); if i then setIndex(i) end end, get=function() return value end}
 end
 
--- Number Input
-local function addNumberInput(parent, label, placeholder, default, onChange)
-    local f = mk("Frame", parent, {Size=UDim2.new(1,-6,0,56), BackgroundColor3=PANEL}); corner(f,10); stroke(f,1)
-    mk("TextLabel", f, {BackgroundTransparency=1, Text=label, Font=Enum.Font.GothamSemibold, TextSize=14,
-        TextColor3=TEXT, Size=UDim2.new(1,-110,0,18), Position=UDim2.fromOffset(10,6), TextXAlignment=Enum.TextXAlignment.Left})
-    local box = mk("TextBox", f, {Size=UDim2.new(0,140,0,26), Position=UDim2.new(1,-150,0,26), PlaceholderText=placeholder or "Ex: 20", Text=tostring(default or ""), Font=Enum.Font.Gotham, TextSize=13, TextColor3=TEXT, PlaceholderColor3=SUB, BackgroundColor3=Color3.fromRGB(40,42,50), ClearTextOnFocus=false})
-    corner(box,8); stroke(box,1)
-    local function apply() local n = tonumber(box.Text); if n and onChange then onChange(n) end end
-    box.FocusLost:Connect(apply)
-    return {set=function(v) box.Text = tostring(v or "") end, get=function() return tonumber(box.Text) end}
+-- ====== KucingHub: Auto Buy/Sell Core ======
+local ALL_SEEDS = {"Wheat","Carrot","Mango","Pumpkin","Watermelon"}
+local ALL_GEARS = {"Hoe","Sprinkler","Rod"}
+local ALL_EGGS  = {"Common","Rare","Epic","Legendary"}
+
+local Learn = {
+  Buy = {remote=nil, sampleArgs=nil},      -- ex FireServer("Seed","Mango",1)
+  SellPet = {remote=nil, sampleArgs=nil},  -- ex FireServer("Pet","Common",1)
+}
+
+do -- learning hook
+  local old
+  old = hookmetamethod(game, "__namecall", function(self, ...)
+    local m = getnamecallmethod()
+    if not checkcaller() and (m=="FireServer" or m=="InvokeServer") then
+      local name = tostring(self.Name or ""):lower()
+      local args = {...}
+      if name:find("buy") or name:find("purchase") or name:find("shop") then
+        Learn.Buy.remote = self
+        Learn.Buy.sampleArgs = table.clone(args)
+        warn("[KucingHub] Learned BUY remote:", self:GetFullName(), "args:", HttpService:JSONEncode(args))
+      end
+      if name:find("sell") and (name:find("pet") or name:find("animal")) then
+        Learn.SellPet.remote = self
+        Learn.SellPet.sampleArgs = table.clone(args)
+        warn("[KucingHub] Learned SELL PET remote:", self:GetFullName(), "args:", HttpService:JSONEncode(args))
+      end
+    end
+    return old(self, ...)
+  end)
+end
+
+local function buildArgsFromSample(sample, replacements)
+  local out = {}
+  for i,v in ipairs(sample or {}) do
+    if type(v)=="string" then
+      if v:lower()=="seed" or v:lower()=="gear" or v:lower()=="egg" then
+        table.insert(out, replacements.Kind or v)
+      elseif replacements.Name and v:lower()==replacements.Name:lower() then
+        table.insert(out, replacements.Name)
+      else
+        if replacements.Kind and (v:lower():find("seed") or v:lower():find("gear") or v:lower():find("egg")) then
+          table.insert(out, replacements.Kind)
+        elseif replacements.Name and v:lower():find(replacements.Name:lower()) then
+          table.insert(out, replacements.Name)
+        else
+          table.insert(out, v)
+        end
+      end
+    elseif type(v)=="number" then
+      table.insert(out, replacements.Qty or v)
+    else
+      table.insert(out, v)
+    end
+  end
+  if #out==0 then
+    if replacements.Kind and replacements.Name then
+      table.insert(out, replacements.Kind); table.insert(out, replacements.Name); table.insert(out, replacements.Qty or 1)
+    elseif replacements.Name then
+      table.insert(out, replacements.Name)
+    end
+  end
+  return out
+end
+
+local function safeCall(remote, args)
+  if not remote then return false, "no remote" end
+  local ok,err = pcall(function()
+    if remote.FireServer then remote:FireServer(unpack(args))
+    else remote:InvokeServer(unpack(args)) end
+  end)
+  return ok, err
+end
+
+-- AUTO BUY
+local function autobuy_list(kind, list, qty)
+  if not Learn.Buy.remote then
+    warn("[KucingHub] Belum 'learn' BUY remote. Klik beli manual sekali dulu.")
+    return
+  end
+  qty = qty or 1
+  for _,name in ipairs(list) do
+    local args = buildArgsFromSample(Learn.Buy.sampleArgs or {}, {Kind=kind, Name=name, Qty=qty})
+    local ok,err = safeCall(Learn.Buy.remote, args)
+    print("[KucingHub][AutoBuy]", kind, name, ok and "OK" or err)
+    task.wait(0.25 + math.random()*0.25)
+  end
+end
+local function autobuy_all()
+  autobuy_list("Seed", ALL_SEEDS, 1)
+  autobuy_list("Gear", ALL_GEARS, 1)
+  autobuy_list("Egg",  ALL_EGGS,  1)
+end
+
+-- AUTO SELL PET (scan & filter)
+local function collectPets()
+  local pets = {}
+  local plr = Players.LocalPlayer
+  local invCandidates = {
+    plr and plr:FindFirstChild("Backpack"),
+    plr and plr:FindFirstChild("PlayerGui"),
+    plr and plr:FindFirstChild("PlayerScripts"),
+    plr and plr:FindFirstChild("StarterGear"),
+    game:GetService("ReplicatedStorage"):FindFirstChild("Pets"),
+    workspace:FindFirstChild("Pets")
+  }
+  local function scan(container)
+    if not container then return end
+    for _,it in ipairs(container:GetDescendants()) do
+      if it:IsA("Folder") or it:IsA("Model") then
+        local name = it.Name
+        local age = it:GetAttribute("Age") or (it:FindFirstChild("Age") and it.Age.Value)
+        local kg  = it:GetAttribute("Weight") or it:GetAttribute("Kg") or (it:FindFirstChild("Weight") and it.Weight.Value)
+        if typeof(age)=="number" or typeof(kg)=="number" then
+          table.insert(pets, {Name=name, Age=age or 0, Kg=kg or 0, Node=it})
+        end
+      end
+    end
+  end
+  for _,c in ipairs(invCandidates) do scan(c) end
+  if #pets==0 then
+    pets = { {Name="Common", Age=0, Kg=0}, {Name="Rare", Age=0, Kg=0} } -- fallback edit sendiri
+  end
+  return pets
+end
+
+local function sellPet_byName(petName)
+  if not Learn.SellPet.remote then
+    warn("[KucingHub] Belum 'learn' SELL PET remote. Klik sell pet manual sekali dulu.")
+    return false
+  end
+  local args = buildArgsFromSample(Learn.SellPet.sampleArgs or {}, {Name=petName, Qty=1})
+  local ok,err = safeCall(Learn.SellPet.remote, args)
+  print("[KucingHub][SellPet]", petName, ok and "OK" or err)
+  return ok
+end
+
+local function sellPetsFiltered(maxAge, maxKg)
+  local list = collectPets()
+  for _,p in ipairs(list) do
+    local a = tonumber(p.Age or 0) or 0
+    local k = tonumber(p.Kg or 0) or 0
+    if a <= (maxAge or math.huge) and k <= (maxKg or math.huge) then
+      sellPet_byName(p.Name)
+      task.wait(0.25 + math.random()*0.15)
+    end
+  end
 end
 
 -- Pages & Tabs
@@ -355,7 +497,7 @@ local P_Visual = addPage("Visual")
 addTab("Main"); addTab("Farm"); addTab("Shop"); addTab("Pet"); addTab("Utility"); addTab("Misc"); addTab("Visual")
 
 -- Info
-card(P_Main, "Information", "Kucing Hub v1.1")
+card(P_Main, "Information", "Kucing Hub v1.2")
 
 -- ===== Character =====
 do
@@ -460,20 +602,61 @@ do
 end
 
 -- ===== SHOP =====
+local buyCard, petCard
 do
+    -- Auto Sell Fruit (placeholder kalau butuh)
     local top = addCollapsibleCard(P_Shop, "Auto Sell Fruit", "", false)
     addToggle(top, "Auto Sell Fruit", false, function(on) print("AutoSellFruit:", on) end)
 
-    local petCard = addCollapsibleCard(P_Shop, "Auto Sell Pet", "", false)
-    addToggle(petCard, "Auto Sell Pet", false, function(on) print("AutoSellPet:", on) end)
+    -- Auto Sell Pet (filter)
+    petCard = addCollapsibleCard(P_Shop, "Auto Sell Pet", "", true)
+    local maxAge, maxKg = 0, 0
+    addNumberInput(petCard, "Sell Pet if Age ≤", "Ex: 1", "0", function(n) maxAge = tonumber(n) or 0 end)
+    addNumberInput(petCard, "Sell Pet if Kg ≤",   "Ex: 2", "0", function(n) maxKg  = tonumber(n) or 0 end)
+    do
+      local loop
+      addToggle(petCard, "Auto Sell Pet", false, function(on)
+        if loop then loop=nil end
+        if on then
+          if not Learn.SellPet.remote then
+            warn("[KucingHub] Klik SELL PET manual sekali dulu agar 'learn' remote & argumen.")
+          end
+          loop = true
+          task.spawn(function()
+            while loop do
+              sellPetsFiltered(maxAge, maxKg)
+              task.wait(5)
+            end
+          end)
+        end
+      end)
+    end
 
-    local buyCard = addCollapsibleCard(P_Shop, "Auto Buy", "", true)
-    addToggle(buyCard, "Auto Buy (stock)", false, function(on) print("AutoBuy:", on) end)
+    -- Auto Buy
+    buyCard = addCollapsibleCard(P_Shop, "Auto Buy", "", true)
+    do
+      local autobuyLoop
+      addToggle(buyCard, "Auto Buy (stock)", false, function(on)
+        if autobuyLoop then autobuyLoop=nil end
+        if on then
+          if not Learn.Buy.remote then
+            warn("[KucingHub] Klik beli manual sekali dulu (Seed/Gear/Egg) agar 'learn' remote.")
+          end
+          autobuyLoop = true
+          task.spawn(function()
+            while autobuyLoop do
+              autobuy_all()
+              task.wait(5)
+            end
+          end)
+        end
+      end)
+    end
 
-    local seeds = {"All","Wheat","Carrot","Mango","Pumpkin"}
+    -- Dropdown dummy (biar UI mirip SS — gak wajib)
+    local seeds = {"All","Wheat","Carrot","Mango","Pumpkin","Watermelon"}
     local gears = {"All","Hoe","Sprinkler","Rod"}
     local eggs  = {"All","Common","Rare","Epic","Legendary"}
-
     addDropdown(buyCard, "Select Seed", seeds, 1, function(v) print("Seed:", v) end)
     addDropdown(buyCard, "Select Gear", gears, 1, function(v) print("Gear:", v) end)
     addDropdown(buyCard, "Select Egg",  eggs,  1, function(v) print("Egg:", v) end)
@@ -484,25 +667,34 @@ end
 do
     card(P_Misc, "Tips", "Auto execute, jangan skip loading, webhook opsional")
 
-    addNumberInput(P_Misc, "Auto Rejoin Delay", "Ex: 20", "", function(n) print("RejoinDelay:", n) end)
-    addToggle(P_Misc, "Auto Rejoin", false, function(on) print("AutoRejoin:", on) end)
+    -- Auto Rejoin (same server)
+    local rejoinDelaySec = 50
+    addNumberInput(P_Misc, "Auto Rejoin Delay", "Ex: 50", "50", function(n)
+        rejoinDelaySec = math.max(5, math.floor(n))
+        print("[KucingHub] RejoinDelay set:", rejoinDelaySec)
+    end)
 
-    local midPet = addCollapsibleCard(P_Misc, "Middle Pet", "", false)
-    addButton(midPet, "Open", function() print("MiddlePet open") end)
+    local rejoinLoop
+    addToggle(P_Misc, "Auto Rejoin", false, function(on)
+        if rejoinLoop then rejoinLoop=nil end
+        if on then
+            rejoinLoop = true
+            task.spawn(function()
+                while rejoinLoop do
+                    for i=1,(rejoinDelaySec or 50) do
+                        if not rejoinLoop then return end
+                        task.wait(1)
+                    end
+                    pcall(function()
+                        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Players.LocalPlayer)
+                    end)
+                end
+            end)
+        end
+    end)
 
-    local infSpr = addCollapsibleCard(P_Misc, "Inf Sprinkler", "", false)
-    addButton(infSpr, "Enable", function() print("InfSprinkler enable") end)
-
-    local steal  = addCollapsibleCard(P_Misc, "Steal", "", false)
-    addButton(steal, "Open", function() print("Steal open") end)
-
-    local seedPack = addCollapsibleCard(P_Misc, "Seed Pack", "", false)
-    addButton(seedPack, "Open", function() print("SeedPack open") end)
-
+    -- Performance dll (opsional)
     local perf = addCollapsibleCard(P_Misc, "Performance", "", true)
-    addToggle(perf, "Hide Plant", false, function(on) print("HidePlant:", on) end)
-    addToggle(perf, "Hide Fruit", false, function(on) print("HideFruit:", on) end)
-    addToggle(perf, "Remove Other Garden", false, function(on) print("RemoveGarden:", on) end)
     addToggle(perf, "Boost FPS (one-way)", false, function(on)
         if on then pcall(function()
             settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
@@ -622,4 +814,4 @@ Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
     end
 end)
 
-print("[Kucing Hub] loaded v1.1")
+print("[Kucing Hub] loaded v1.2")
